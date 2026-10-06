@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ketentuan Retur - PT Artasedana Sesetan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3x.dev/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans" x-data="app()">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-md py-4 px-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-bold">PT Artasedana Singaraja</h1>
+            <p class="text-xs text-blue-100">Cabang Sesetan - Pusat Ketentuan Retur</p>
+        </div>
+        <div>
+            <template x-if="!isAdmin">
+                <button @click="showLoginModal = true" class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded text-sm font-semibold transition">Login Admin</button>
+            </template>
+            <template x-if="isAdmin">
+                <div class="flex gap-2">
+                    <button @click="currentTab = 'admin'" class="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded text-sm">Dashboard Admin</button>
+                    <button @click="currentTab = 'user'; logout();" class="bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded text-sm">Logout</button>
+                </div>
+            </template>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto p-4 sm:p-6 mt-6">
+
+        <!-- USER VIEW: Pencarian -->
+        <template x-if="currentTab === 'user'">
+            <div>
+                <div class="text-center mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800">Cari Ketentuan Retur Supplier (SPL)</h2>
+                    <p class="text-gray-500 text-sm mt-1">Ketik Kode SPL (Contoh: V-001100) atau Nama SPL</p>
+                    
+                    <!-- Search Input -->
+                    <div class="mt-4 max-w-lg mx-auto">
+                        <input type="text" x-model="searchQuery" @input.debounce.300ms="searchData()" placeholder="Cari Kode SPL / Nama SPL..." class="w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700">
+                    </div>
+                </div>
+
+                <!-- Hasil Pencarian -->
+                <div class="grid gap-4">
+                    <template x-for="item in searchResults" :key="item.id">
+                        <div class="bg-white p-5 rounded-lg shadow border border-gray-100 hover:shadow-md transition">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 mb-3">
+                                <div>
+                                    <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded" x-text="item.kode_spl"></span>
+                                    <h3 class="text-lg font-bold text-gray-800 mt-1" x-text="item.nama_spl"></h3>
+                                </div>
+                                <div class="mt-2 sm:mt-0 text-sm text-gray-600">
+                                    Sales: <span class="font-semibold text-gray-800" x-text="item.nomor_sales || '-'"></span>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Ketentuan Retur:</h4>
+                                <p class="text-gray-700 text-sm whitespace-pre-line" x-text="item.ketentuan_retur"></p>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="searchResults.length === 0 && searchQuery.length > 0">
+                        <div class="text-center py-10 text-gray-500">Data SPL tidak ditemukan.</div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- ADMIN VIEW: Dashboard CRUD -->
+        <template x-if="currentTab === 'admin'">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                    <h2 class="text-xl font-bold text-gray-800">Manajemen Data SPL</h2>
+                    <div class="flex flex-wrap gap-2">
+                        <button @click="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-medium">+ Tambah SPL</button>
+                        <button @click="exportExcel()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm font-medium">Export Excel</button>
+                        <label class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded text-sm font-medium cursor-pointer">
+                            Import Excel <input type="file" @change="importExcel($event)" class="hidden" accept=".xlsx, .xls">
+                        </label>
+                        <button @click="bulkDelete()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-medium" :disabled="selectedIds.length === 0">Hapus Dipilih</button>
+                    </div>
+                </div>
+
+                <!-- Tabel Data Admin -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 border-b text-xs font-bold text-gray-600 uppercase">
+                                <th class="p-3 w-10"><input type="checkbox" @click="toggleSelectAll($event)"></th>
+                                <th class="p-3">Kode SPL</th>
+                                <th class="p-3">Nama SPL</th>
+                                <th class="p-3">Nomor Sales</th>
+                                <th class="p-3">Ketentuan Retur</th>
+                                <th class="p-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm divide-y">
+                            <template x-for="item in adminData" :key="item.id">
+                                <tr class="hover:bg-gray-50">
+                                    <td class="p-3"><input type="checkbox" value="item.id" x-model.number="selectedIds" :value="item.id"></td>
+                                    <td class="p-3 font-semibold text-blue-600" x-text="item.kode_spl"></td>
+                                    <td class="p-3 font-medium text-gray-800" x-text="item.nama_spl"></td>
+                                    <td class="p-3 text-gray-600" x-text="item.nomor_sales"></td>
+                                    <td class="p-3 text-gray-600 max-w-xs truncate" x-text="item.ketentuan_retur"></td>
+                                    <td class="p-3 text-center space-x-2">
+                                        <button @click="editData(item)" class="text-blue-600 hover:underline">Edit</button>
+                                        <button @click="deleteData(item.id)" class="text-red-600 hover:underline">Hapus</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </template>
+    </main>
+
+    <!-- Modal Login -->
+    <div x-show="showLoginModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full shadow-lg" @click.away="showLoginModal = false">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Login Admin</h3>
+            <form @submit.prevent="login()">
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Username</label>
+                    <input type="text" x-model="loginForm.username" class="w-full border p-2 rounded text-sm" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Password</label>
+                    <input type="password" x-model="loginForm.password" class="w-full border p-2 rounded text-sm" required>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="showLoginModal = false" class="bg-gray-300 px-3 py-1.5 rounded text-sm">Batal</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm">Login</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Form Tambah/Edit SPL -->
+    <div x-show="showFormModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg p-6 max-w-lg w-full shadow-lg">
+            <h3 class="text-lg font-bold mb-4 text-gray-800" x-text="isEditMode ? 'Edit Data SPL' : 'Tambah Data SPL'"></h3>
+            <form @submit.prevent="saveSpl()">
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Kode SPL (Contoh: V-001100)</label>
+                    <input type="text" x-model="form.kode_spl" class="w-full border p-2 rounded text-sm" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Nama SPL / Supplier</label>
+                    <input type="text" x-model="form.nama_spl" class="w-full border p-2 rounded text-sm" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Nomor Sales</label>
+                    <input type="text" x-model="form.nomor_sales" class="w-full border p-2 rounded text-sm">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Ketentuan Retur</label>
+                    <textarea x-model="form.ketentuan_retur" rows="4" class="w-full border p-2 rounded text-sm" required></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="showFormModal = false" class="bg-gray-300 px-3 py-1.5 rounded text-sm">Batal</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                currentTab: 'user',
+                isAdmin: false,
+                showLoginModal: false,
+                showFormModal: false,
+                isEditMode: false,
+                searchQuery: '',
+                searchResults: [],
+                adminData: [],
+                selectedIds: [],
+                loginForm: { username: '', password: '' },
+                form: { id: null, kode_spl: '', nama_spl: '', nomor_sales: '', ketentuan_retur: '' },
+
+                async searchData() {
+                    if (!this.searchQuery) {
+                        this.searchResults = [];
+                        return;
+                    }
+                    const res = await fetch(`/api/search?q=${encodeURIComponent(this.searchQuery)}`);
+                    this.searchResults = await res.json();
+                },
+
+                async login() {
+                    const res = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.loginForm)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.isAdmin = true;
+                        this.showLoginModal = false;
+                        this.currentTab = 'admin';
+                        this.loadAdminData();
+                        this.loginForm = { username: '', password: '' };
+                    } else {
+                        alert(data.message);
+                    }
+                },
+
+                logout() {
+                    this.isAdmin = false;
+                    this.currentTab = 'user';
+                },
+
+                async loadAdminData() {
+                    const res = await fetch('/api/spl');
+                    this.adminData = await res.json();
+                    this.selectedIds = [];
+                },
+
+                openModal() {
+                    this.isEditMode = false;
+                    this.form = { id: null, kode_spl: 'V-', nama_spl: '', nomor_sales: '', ketentuan_retur: '' };
+                    this.showFormModal = true;
+                },
+
+                editData(item) {
+                    this.isEditMode = true;
+                    this.form = { ...item };
+                    this.showFormModal = true;
+                },
+
+                async saveSpl() {
+                    const url = this.isEditMode ? `/api/spl/${this.form.id}` : '/api/spl';
+                    const method = this.isEditMode ? 'PUT' : 'POST';
+                    
+                    const res = await fetch(url, {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.form)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.showFormModal = false;
+                        this.loadAdminData();
+                    } else {
+                        alert(data.error);
+                    }
+                },
+
+                async deleteData(id) {
+                    if (confirm('Yakin ingin menghapus data ini?')) {
+                        await fetch(`/api/spl/${id}`, { method: 'DELETE' });
+                        this.loadAdminData();
+                    }
+                },
+
+                toggleSelectAll(e) {
+                    if (e.target.checked) {
+                        this.selectedIds = this.adminData.map(i => i.id);
+                    } else {
+                        this.selectedIds = [];
+                    }
+                },
+
+                async bulkDelete() {
+                    if (confirm(`Yakin ingin menghapus ${this.selectedIds.length} data terpilih?`)) {
+                        await fetch('/api/spl/bulk-delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ids: this.selectedIds })
+                        });
+                        this.loadAdminData();
+                    }
+                },
+
+                async importExcel(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const res = await fetch('/api/import', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert('Berhasil mengimpor data!');
+                        this.loadAdminData();
+                    } else {
+                        alert('Gagal import: ' + data.error);
+                    }
+                    e.target.value = '';
+                },
+
+                exportExcel() {
+                    window.location.href = '/api/export';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
